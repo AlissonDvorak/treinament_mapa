@@ -8,20 +8,20 @@ import { AppComponent } from './app.component';
 import { MapComponent } from './map/map.component';
 import { PopUpService } from './popup.service';
 import { ShapeService } from './shape.service';
-
-
+import { DialogComponent } from './dialog/dialog.component';
+import { MatDialogModule } from '@angular/material/dialog';
 
 
 @NgModule({
   declarations: [
     AppComponent,
     MapComponent,
-
- 
+    DialogComponent,
   ],
   imports: [
     BrowserModule,
-    HttpClientModule
+    HttpClientModule,
+    MatDialogModule,
   ],
   providers: [
     MarkerService,

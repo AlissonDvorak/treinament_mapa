@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 
 @Injectable({
   providedIn: 'root'
@@ -10,16 +10,8 @@ export class ShapeService {
   headers = new HttpHeaders({
     'Content-Type': 'application/json',
   });
-  apiURL = 'http://localhost:8000/'
+  apiURL = 'http://192.168.100.81:8000/'
 
-  getStateShapes() {
-    
-    return this.http.post(`${this.apiURL}setores/obter_setores`, '{"bottomLeft":{"lat":-9.671370, "lng":-35.787824},"topRight":{"lat":-9.645309,"lng": -35.700146}}', { headers: this.headers })
-
-    
-
-  }
-
-  
-}
-
+  getStateShapes(bounds): any {
+    return this.http.post(`${this.apiURL}setores/obter_setores`, bounds, { headers: this.headers })
+    }}

@@ -22,6 +22,15 @@
   box-shadow: 0 1px 7px #999;
 }
 
+::ng-deep .info.legend.leaflet-control{
+	border: 2px solid #fff;
+	box-shadow: 0 1px 7px #999;
+	width: 133px;
+	text-align: center
+    
+    
+  }
+
 ::ng-deep .marker-cluster-small {
   background-color: rgba(181, 226, 140, 0.6);
 }
@@ -441,3 +450,11 @@
 ::ng-deep .leaflet-oldie .leaflet-draw-toolbar {
 	border: 1px solid #999;
 }
+::ng-deep .mat-mdc-dialog-surface {
+	z-index: 10000;
+	max-width: none;
+  	width: auto;
+	position: absolute;
+	top: 100;
+	left: 100;
+  }

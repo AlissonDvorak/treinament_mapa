@@ -1,0 +1,9 @@
+::ng-deep .dialog-actions {
+  display: flex;
+  justify-content: center;
+}
+
+::ng-deep .mat-mdc-dialog-actions.mdc-dialog__actions
+{
+ height: "1px";
+}
