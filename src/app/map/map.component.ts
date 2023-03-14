@@ -9,10 +9,8 @@ import { MatDialog } from '@angular/material/dialog';
 import 'leaflet.control.opacity';
 import 'leaflet-dialog';
 import { DialogComponent } from '../dialog/dialog.component';
-import * as turf from '@turf/turf'
-
-
-
+import * as turf from '@turf/turf';
+import 'leaflet-range';
 
 
 // variaveis iniciais
@@ -23,8 +21,13 @@ let openStreet = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 const setoresGroup = L.layerGroup();
 const clienteGroup = L.layerGroup();
 const _this = this
+var minimo = Infinity
+var maximo = - Infinity
+let legendControl;
 
 
+
+// define palheta de cores
 function getColor(d) {
   return d > 10000 ? '#024a0b' :
     d > 5000 ? '#8ddf12' :
@@ -34,6 +37,8 @@ function getColor(d) {
             '	#bd0026';
 
 }
+
+
 // marcador default 
 const iconDefault = L.icon({
   iconRetinaUrl,
@@ -51,10 +56,14 @@ L.Marker.prototype.options.icon = iconDefault;
   templateUrl: './map.component.html',
   styleUrls: ['./map.component.css'],
 
+
 })
 
 
+
 export class MapComponent implements AfterViewInit {
+  sliderValue = 5; // Valor padrão do slider
+  isLoading = true;
   private map: L.Map = {} as L.Map;
   private setoresIbge;
   search: any = undefined;
@@ -67,22 +76,32 @@ export class MapComponent implements AfterViewInit {
   gruposetores: any;
   setoresLayer: any;
   clientesSebrae: any;
-  
+  dados: any;
+
+
+
   private getMapBounds() {
     var bounds = this.map.getBounds();
     this.northEast = bounds.getNorthEast();
     this.southWest = bounds.getSouthWest();
   }
 
+
+
   // inicializar mapa leaftlet
   private initMap(): void {
+
+
     this.map = L.map('map', {
 
       zoomControl: false,
       zoomAnimation: true,
       center: [-9.66625, -35.7351],
-      zoom: 15
+      zoom: 15,
+
     });
+
+
 
     this.basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
@@ -91,28 +110,21 @@ export class MapComponent implements AfterViewInit {
     });
     this.basemap.addTo(this.map);
     this.getMapBounds()
-    
+
+
+
 
     this.map.on('moveend', () => {
       this.map.invalidateSize();
       var center = this.map.getCenter();
-      // var bounds = this.map.getBounds();
-      // this.northEast = bounds.getNorthEast();
-      // this.southWest = bounds.getSouthWest();
+
       this.getMapBounds()
       let area = (this.northEast.lat - this.southWest.lat) * (this.northEast.lng - this.southWest.lng)
-      // console.log("CENTRO");
-      // console.log(center,);
-      // console.log("TOPRIGTH");
-      // console.log(this.northEast);
-      // console.log("BOTTONLEFT");
-      // console.log(this.southWest);
 
 
       if (area > 0.0077434690123643285) {
         var center = this.map.getCenter();
         console.log("excedeu o tamanho");
-
 
       }
 
@@ -128,7 +140,6 @@ export class MapComponent implements AfterViewInit {
     }).addTo(this.map);
 
 
-
     // configs minimapa
     var minimap = new L.TileLayer(openStreet, {
       minZoom: 0,
@@ -136,15 +147,15 @@ export class MapComponent implements AfterViewInit {
     });
     var miniMap = new MiniMap(minimap).addTo(this.map);
 
+
     // configs busca endereco
     const search = SearchControl({
-      style: "button",
+      style: "bar",
       searchLabel: 'Busca por endereço',
       provider: provider,
       autoClose: true,
       retainZoomLevel: true
     }); search.addTo(this.map);
-
 
 
     // configs controle de busca por circulos ou poligonos
@@ -168,37 +179,46 @@ export class MapComponent implements AfterViewInit {
 
       if (type === 'circle') {
         this.checkBounds(type, layer);
-        
-        // this.resumoClientes('circulo')
+        this.resumoClientes('circulo')
 
       } else if (type === 'polygon') {
         this.checkBounds(type, layer);
-        // this.resumoClientes('poligono')
+        clienteGroup.clearLayers();
+        this.resumoClientes('poligono')
       }
     });
-    // legenda de renda
-    var legend = new L.Control({ position: 'bottomright' });
-    legend.onAdd = function (map) {
+  }
+
+
+  // legenda de renda
+  legenda() {
+    if (legendControl) {
+      this.map.removeControl(legendControl);
+    }
+    legendControl = new L.Control({ position: 'bottomright' });
+    legendControl.onAdd = function (map) {
+      minimo.toFixed(2)
+      maximo.toFixed(2)
+      let media = parseInt((minimo + maximo * 0.5).toFixed(2))
+      let tresQuarto = parseInt((minimo + maximo * 0.75).toFixed(2))
+      let umQuarto = parseInt((minimo + maximo * 0.25).toFixed(2))
 
       var div = L.DomUtil.create('div', 'info legend'),
-        grades = [0, 500, 1000, 2000, 5000, 10000],
-        labels = [];
+        grades = [minimo, umQuarto, media, tresQuarto, maximo];
       div.innerHTML += "<h4><b>Renda</b></h4>"
       for (var i = 0; i < grades.length; i++) {
         div.innerHTML +=
           '<i style="background:' + getColor(grades[i] + 1) + '"></i> ' +
-          grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
+          grades[i] + (grades[i + 1] ? ' &ndash; ' + grades[i + 1] + '<br>' : '+');
       }
       return div;
     };
-    legend.addTo(this.map);
-
-
+    legendControl.addTo(this.map);
   }
 
 
+  // controle de camadas
   camadas() {
-
     var baseMaps = {
       "OpenStreetMap": this.basemap,
     };
@@ -207,15 +227,15 @@ export class MapComponent implements AfterViewInit {
       "Clientes": this.markersClusters,
       "setores": setoresGroup
     };
-    var Map_AddLayer  = {
+    var Map_AddLayer = {
       "setores": setoresGroup
     }
-    
-    var opacityControl = L.control.opacity(Map_AddLayer , { position: 'topright' });
+    var opacityControl = L.control.opacity(Map_AddLayer, { position: 'topright' });
     opacityControl.addTo(this.map);
     L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(this.map);
   }
   constructor(private dialog: MatDialog, private markerService: MarkerService, private shapeService: ShapeService) { }
+
 
   // quando passa o mouse sobre o setor, muda de cor
   private highlightFeature(e) {
@@ -229,6 +249,7 @@ export class MapComponent implements AfterViewInit {
     });
   }
 
+
   // volta a cor padrao quando tira o mouse de cimaa
   private resetFeature(e) {
     const layer = e.target;
@@ -241,30 +262,32 @@ export class MapComponent implements AfterViewInit {
     });
   }
 
+
+  // responsavel pelo texto de clientes
   dialogText(message?, rendaMedia?, type?) {
     setTimeout(() => {
+
       const dialogRef = this.dialog.open(DialogComponent, {
         width: '260px',
-        position: {top: '50px', left: '100px'},
+        position: { top: '50px', left: '100px' },
         data: {
           title: `Clientes Sebrae no ${type} `,
           message: message,
           rendaMedia: rendaMedia
         },
       });
-    }, 0);
+    }, 10);
   }
-
 
   resumoClientes(type) {
     var nClientes,
       rendaMedia: any = [],
       sum = 0
 
+
     let cliente = this.clientesSebrae
     nClientes = cliente['CLIENTES'].length
 
-    // RENDA_NOMINAL_MEDIA,
     for (var i = 0; i < nClientes; i++) {
       let m = this.clientesSebrae['CLIENTES'][i]['RENDA_NOMINAL_MEDIA'];
       rendaMedia.push(m)
@@ -284,6 +307,8 @@ export class MapComponent implements AfterViewInit {
   grupoUnidades: any
 
   makeUnidades() {
+
+
 
     var sebraeIcon = L.icon({
       iconUrl: './assets/data/marcador.png',
@@ -309,6 +334,7 @@ export class MapComponent implements AfterViewInit {
       this.grupoUnidades.addTo(this.map)
       this.camadas()
     })
+
   }
 
 
@@ -318,21 +344,31 @@ export class MapComponent implements AfterViewInit {
     this.makeUnidades()
     this.obterSetores()
     this.checkBounds()
-  }
 
+  }
 
   obterSetores(sw?, ne?) {
     let cont = 0;
+    minimo = Infinity
+    maximo = -Infinity
 
-    this.shapeService.getStateShapes(`{"bottomLeft":{"lat":${sw ? sw.lat : '-9.68464869895314'}, "lng":${sw ? sw.lng : '-35.70878505706788'}},
-    "topRight":{"lat":${ne ? ne.lat : '-9.647884739101269'},"lng":${ne ? ne.lng : '-35.76144218444825'}}}`)
-      .subscribe(setoresIbge => {    
+    this.shapeService.getStateShapes(`{"bottomLeft":{"lat":${sw ? sw.lat : this.southWest.lat}, "lng":${sw ? sw.lng : this.southWest.lng}},
+    "topRight":{"lat":${ne ? ne.lat : this.northEast.lat},"lng":${ne ? ne.lng : this.northEast.lng}}}`)
+      .subscribe(setoresIbge => {
         if (this.setoresLayer) {
           this.setoresLayer.clearLayers();
         }
 
         const dados = setoresIbge['SETORES'].map((setor) => {
           cont++;
+
+          const densidade = setor['V009'];
+          if (densidade < minimo) {
+            minimo = densidade;
+          }
+          if (densidade > maximo) {
+            maximo = densidade;
+          }
           return {
             type: "Feature",
             id: cont,
@@ -360,52 +396,167 @@ export class MapComponent implements AfterViewInit {
               layer.bindPopup(`Nome: ${feature.properties.name}<br>Densidade: ${feature.properties.densidade}<br>Numero de Clientes: ${feature.properties.densidade}
               `);
               layer.on({
+                click: (e) => {
+                  console.log()
+
+                  // chamar funcao q calcula quais clientes estao dentro desse poligono(utilizar bounds disponiveis na variavel dados[i])
+
+                  const feature = e.target.feature;
+                  const numClientes = feature.properties["Numero de Clientes"] || 0;
+                  const empreend = feature.properties["empreendedorismo"] || 0;
+                  const finan = feature.properties["financas"] || 0;
+                  const inov = feature.properties["inovacao"] || 0;
+                  const leisnormas = feature.properties["leis e normas"] || 0;
+                  const mercado = feature.properties["mercado"] || 0;
+                  const organizacao = feature.properties["organizacao"] || 0;
+                  const pessoas = feature.properties["pessoas"] || 0;
+                  const processos = feature.properties["processos"] || 0;
+                  const numRealizacoes = (empreend + finan + inov + leisnormas + mercado + organizacao + pessoas + processos)
+                  console.log(feature.properties)
+                  layer.bindPopup(`Nome: ${feature.properties.name}<br>Densidade: ${feature.properties.densidade}<br>Número de Clientes: ${numClientes}<br>Qtd realizacoes : ${numRealizacoes}`);
+                },
                 mouseover: (e) => (this.highlightFeature(e)),
                 mouseout: (e) => (this.resetFeature(e)),
               })
             }
-            
+
           });
           setorLayer.addTo(setoresGroup);
           clienteGroup.clearLayers();
           setoresGroup.addTo(this.map);
 
         }
-        
-        
+        this.dados = dados
+        console.log(minimo)
+        console.log(maximo)
+
+        this.legenda()
+
       })
+
+
   };
 
   obterCliente() {
-    this.markerService.makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false).then(clientesSebrae => {
+    this.isLoading = true
+
+    this.markerService.makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false).subscribe(clientesSebrae => {
 
       this.markersClusters.clearLayers();
 
       for (var i = 0; i < clientesSebrae['CLIENTES'].length; i++) {
         const lon = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[0];
         const lat = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[1];
-        const marker = L.marker([lat, lon]);
+        const marker = L.marker([lat, lon]).bindPopup(
+          `Código: <b>${clientesSebrae['CLIENTES'][i]["CODPARCEIRO"]}</b>
+           <br>Renda Media: <b>${clientesSebrae['CLIENTES'][i]["RENDA_NOMINAL_MEDIA"]}</b>
+          `
+        );
 
         this.markersClusters.addLayer(marker)
-          .bindPopup(
-            `Código: <b>${clientesSebrae['CLIENTES'][i]["CODPARCEIRO"]}</b>
-             <br>Renda Media: <b>${clientesSebrae['CLIENTES'][i]["RENDA_NOMINAL_MEDIA"]}</b>
-            `
-          );
-        this.markersClusters.addTo(clienteGroup);
+          
       }
+      this.markersClusters.addTo(clienteGroup);
 
       clienteGroup.addTo(this.map)
       this.clientesSebrae = clientesSebrae;
     })
+
+    setTimeout(() => {
+      this.isLoading = false;
+    }, 2000);
   }
 
 
+
+  // obterCliente() {
+  //   this.isLoading = true
+
+
+  //   this.markerService.makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false).subscribe(clientesSebrae => {
+  //     this.markersClusters.clearLayers();
+  //     let clientesPorSetor = {};
+
+      
+
+  //     for (var i = 0; i < clientesSebrae['CLIENTES'].length; i++) {
+  //       const lon = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[0];
+  //       const lat = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[1];
+
+  //       for (var j = 0; j < this.dados.length; j++) {
+  //         const setor = this.dados[j];
+
+         
+
+  //         if (turf.booleanPointInPolygon(turf.point([lon, lat]), setor.geometry)) {
+  //           if (!clientesPorSetor[j]) {
+  //             clientesPorSetor[j] = {
+  //               "Quantidade": 1,
+  //               "TEMA_REALI_EMPREENDEDORISMO" : clientesSebrae['CLIENTES'][j].TEMA_REALI_EMPREENDEDORISMO,
+  //               "TEMA_REALI_FINANCAS" : clientesSebrae['CLIENTES'][j].TEMA_REALI_FINANCAS,
+  //               "TEMA_REALI_INOVACAO" : clientesSebrae['CLIENTES'][j].TEMA_REALI_INOVACAO,
+  //               "TEMA_REALI_LEIS_E_NORMAS" : clientesSebrae['CLIENTES'][j].TEMA_REALI_LEIS_E_NORMAS,
+  //               "TEMA_REALI_MERCADO" : clientesSebrae['CLIENTES'][j].TEMA_REALI_MERCADO,
+  //               "TEMA_REALI_ORGANIZACAO" : clientesSebrae['CLIENTES'][j].TEMA_REALI_ORGANIZACAO,
+  //               "TEMA_REALI_PESSOAS" : clientesSebrae['CLIENTES'][j].TEMA_REALI_PESSOAS,
+  //               "TEMA_REALI_PROCESSOS" : clientesSebrae['CLIENTES'][j].TEMA_REALI_PROCESSOS
+  //             };
+
+  //           } else {
+  //             clientesPorSetor[j] = {
+
+  //               "Quantidade": clientesPorSetor[j]['Quantidade']++ ,
+  //               "TEMA_REALI_EMPREENDEDORISMO" : clientesPorSetor[j]["TEMA_REALI_EMPREENDEDORISMO"] += clientesSebrae['CLIENTES'][j].TEMA_REALI_EMPREENDEDORISMO,
+  //               "TEMA_REALI_FINANCAS" : clientesPorSetor[j]["TEMA_REALI_FINANCAS"] += clientesSebrae['CLIENTES'][j].TEMA_REALI_FINANCAS,
+  //               "TEMA_REALI_INOVACAO" : clientesPorSetor[j]["TEMA_REALI_INOVACAO"] += clientesSebrae['CLIENTES'][j].TEMA_REALI_INOVACAO,
+  //               "TEMA_REALI_LEIS_E_NORMAS" : clientesPorSetor[j]["TEMA_REALI_LEIS_E_NORMAS"] += clientesSebrae['CLIENTES'][j].TEMA_REALI_LEIS_E_NORMAS,
+  //               "TEMA_REALI_MERCADO" : clientesPorSetor[j]["TEMA_REALI_MERCADO"] += clientesSebrae['CLIENTES'][j].TEMA_REALI_MERCADO,
+  //               "TEMA_REALI_ORGANIZACAO" : clientesPorSetor[j]["TEMA_REALI_ORGANIZACAO"] += clientesSebrae['CLIENTES'][j].TEMA_REALI_ORGANIZACAO,
+  //               "TEMA_REALI_PESSOAS" : clientesPorSetor[j]["TEMA_REALI_PESSOAS"] += clientesSebrae['CLIENTES'][j].TEMA_REALI_PESSOAS,
+  //               "TEMA_REALI_PROCESSOS" : clientesPorSetor[j]["TEMA_REALI_PROCESSOS"] += clientesSebrae['CLIENTES'][j].TEMA_REALI_PROCESSOS
+
+  //             };
+  //           }
+  //           break;
+  //         }
+  //         // console.log(clientesPorSetor[j])
+  //       }
+  //       const marker = L.marker([lat, lon]).bindPopup(
+  //         `Código: <b>${clientesSebrae['CLIENTES'][i]["CODPARCEIRO"]}</b>
+  //          <br>EMPREENDEDORISMO: <b>${clientesSebrae['CLIENTES'][i]["TEMA_REALI_EMPREENDEDORISMO"]}</b>
+  //          <br>FINANCAS: <b>${clientesSebrae['CLIENTES'][i]["TEMA_REALI_FINANCAS"]}</b>
+  //          `
+  //       );
+  //       this.markersClusters.addLayer(marker)
+  //     }
+  //     this.markersClusters.addTo(clienteGroup);
+
+  //     for (var k = 0; k < this.dados.length; k++) {
+  //       const setor = this.dados[k];
+  //       if (clientesPorSetor[k]) {
+  //         setor.properties = clientesPorSetor[k];
+          
+  //       } else {
+  //         setor.properties["Numero de Clientes"] = 0;
+  //       }
+  //     }
+  //     clienteGroup.addTo(this.map)
+  //     this.clientesSebrae = clientesSebrae;
+  //   })
+
+    // setTimeout(() => {
+    //   this.isLoading = false;
+    // }, 2000);
+
+  // }
+
   checkBounds(type?, layer?) {
 
+
     let ArrayCoord: any = []
-    let currentBounds: any;
+
     this.centroBounds = this.map.getCenter();
+    clienteGroup.clearLayers();
 
     if (type == 'polygon') {
       layer.editing.latlngs[0][0].forEach((coord) => {
@@ -434,19 +585,19 @@ export class MapComponent implements AfterViewInit {
       this.geoApiQuery = {
         map_bounds_retangulo: {
           bottomLeft: {
-            lat:  this.southWest.lat,
-            lng: this.southWest.lng 
+            lat: this.southWest.lat,
+            lng: this.southWest.lng
           },
           topRight: {
             lat: this.northEast.lat,
-            lng: this.northEast.lng 
+            lng: this.northEast.lng
           },
         },
       }
     };
     this.obterCliente()
+
   }
-
-
-
 }
+
+

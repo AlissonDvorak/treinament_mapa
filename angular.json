@@ -38,6 +38,23 @@
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
           "options": {
+            "allowedCommonJsDependencies": [
+              "geojson-equality",
+              "turf-jsts",
+              "density-clustering",
+              "skmeans",
+              "concaveman",
+              "rbush",
+              "polygon-clipping",
+              "object-assign",
+              "geojson-rbush",
+              "deep-equalearcut",
+              "leaflet",
+              "leaflet.markercluster",
+              "deep-equal",
+              "earcut"
+
+            ],
             "outputPath": "dist/mapa",
             "index": "src/index.html",
             "main": "src/main.ts",

@@ -10,6 +10,10 @@ import { PopUpService } from './popup.service';
 import { ShapeService } from './shape.service';
 import { DialogComponent } from './dialog/dialog.component';
 import { MatDialogModule } from '@angular/material/dialog';
+import { LoadingComponent } from './loading/loading.component';
+import { NgxSliderModule } from '@angular-slider/ngx-slider';
+
+
 
 
 @NgModule({
@@ -17,11 +21,16 @@ import { MatDialogModule } from '@angular/material/dialog';
     AppComponent,
     MapComponent,
     DialogComponent,
+    LoadingComponent,
+
+ 
   ],
   imports: [
     BrowserModule,
     HttpClientModule,
     MatDialogModule,
+    NgxSliderModule
+
   ],
   providers: [
     MarkerService,
