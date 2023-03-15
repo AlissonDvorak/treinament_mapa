@@ -38,16 +38,7 @@ makeclientsMarkers(bounds, tipoCliente, infoExtras, download, contagem  ) {
 
  let params = new HttpParams().set('tipo_cliente' , tipoCliente ).set('retornar_informacoes_extras',infoExtras ).set('download', download).set('obter_somente_contagem', contagem)
  return this.http.post(`${this.apiURL}clientes/obter_clientes`, bounds,{headers: this.headers, params})
+ 
 
 }}
 
-// makeclientsMarkers(bounds, tipoCliente, infoExtras, download, contagem): Promise<any> {
-//   return new Promise(resolve => {
-//     let params = new HttpParams().set('tipo_cliente' , tipoCliente ).set('retornar_informacoes_extras',infoExtras ).set('download', download).set('obter_somente_contagem', contagem)
-//     this.http.post(`${this.apiURL}clientes/obter_clientes`, bounds,{headers: this.headers, params}).subscribe(result => {
-//       resolve(result);
-//     }, error => {
-//       resolve(error);
-//     });
-//   });
-//  }}
