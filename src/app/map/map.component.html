@@ -13,7 +13,25 @@
     <div class="map-frame">
       <app-loading *ngIf="isLoading"></app-loading>
 
+
+      <div class="box">
+        <select>
+          <option value="0">Filtros</option>
+          <option value="1">Numero de Clientes</option>
+          <option value="2">Empreendedorismo</option>
+          <option value="3">Financas</option>
+          <option value="4">Inovacao</option>
+          <option value="5">Leis e Normas</option>
+          <option value="6">Mercado</option>
+          <option value="7">Pessoas</option>
+          <option value="8">Processos</option>
+        </select>
+        <ngx-slider [(value)]="minValue" [(highValue)]="maxValue" [options]="options" class="slider"></ngx-slider>
+      </div>
+
+    
       <div id="map"></div>
+      
     </div>
   </div>
   <script>
