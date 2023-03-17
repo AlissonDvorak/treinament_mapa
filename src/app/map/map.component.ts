@@ -12,7 +12,7 @@ import { DialogComponent } from '../dialog/dialog.component';
 import 'leaflet-range';
 import { Options } from '@angular-slider/ngx-slider';
 import * as turf from '@turf/turf';
-import { ConstantPool } from '@angular/compiler';
+import * as pointIp from 'robust-point-in-polygon';
 
 
 // variaveis iniciais
@@ -64,9 +64,9 @@ L.Marker.prototype.options.icon = iconDefault;
 
 
 export class MapComponent implements AfterViewInit {
-
+  valorfiltro = 0
   minValue: number = 0;
-  maxValue: number = 80;
+  maxValue: number = 100;
   options: Options = {
     ceil: 100,
     showSelectionBar: true,
@@ -130,7 +130,7 @@ export class MapComponent implements AfterViewInit {
         console.log("excedeu o tamanho");
       }
       this.obterSetores(this.northEast, this.southWest);
-      this.checkBounds();
+      // this.checkBounds();
     });
 
 
@@ -365,6 +365,7 @@ export class MapComponent implements AfterViewInit {
           if (renda > maximo) {
             maximo = renda;
           }
+          
 
           return {
             type: "Feature",
@@ -372,6 +373,7 @@ export class MapComponent implements AfterViewInit {
             properties: {
               name: setor['Nome_do_bairro'],
               renda: setor['V009'],
+              realizacoes: this.filtrarPorRealizacoes(setor['geometry']['coordinates'])[0]
             },
             geometry: {
               type: "Polygon",
@@ -379,7 +381,7 @@ export class MapComponent implements AfterViewInit {
             }
           };
         });
-
+        
         setoresGroup.clearLayers();
         for (var i = 0; i < dados.length; i++) {
           const setorLayer = L.geoJSON(dados[i], {
@@ -429,73 +431,115 @@ export class MapComponent implements AfterViewInit {
           setoresGroup.addTo(this.map);
         }
         this.dados = dados
+        console.log(dados)
         this.legenda()
       })
   };
+  recarregarMapa(){
+    this.obterSetores(this.northEast, this.southWest);
+    this.checkBounds();
 
-  filtrarPorRealizacoes() {
-
-
-    this.markerService.makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false).subscribe(clientesSebrae => {
-
-      this.markersClusters.clearLayers();
-      let clientesPorSetor = {};
-      
-    
-
-      for (var i = 0; i < clientesSebrae['CLIENTES'].length; i++) {
-        const lon = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[0];
-        const lat = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[1];
-
-        for (var j = 0; j < this.dados.length; j++) {
-          const setor = this.dados[j];
-
-
-          if (turf.booleanPointInPolygon(turf.point([lon, lat]), setor.geometry)) {
-            if (!clientesPorSetor[j]) {
-              clientesPorSetor[j] = {
-                TEMA_REALI_EMPREENDEDORISMO: clientesSebrae['CLIENTES'][i].TEMA_REALI_EMPREENDEDORISMO,
-                TEMA_REALI_FINANCAS: clientesSebrae['CLIENTES'][i].TEMA_REALI_FINANCAS,
-                TEMA_REALI_INOVACAO: clientesSebrae['CLIENTES'][i].TEMA_REALI_INOVACAO,
-                TEMA_REALI_LEIS_E_NORMAS: clientesSebrae['CLIENTES'][i].TEMA_REALI_LEIS_E_NORMAS,
-                TEMA_REALI_MERCADO: clientesSebrae['CLIENTES'][i].TEMA_REALI_MERCADO,
-                TEMA_REALI_ORGANIZACAO: clientesSebrae['CLIENTES'][i].TEMA_REALI_ORGANIZACAO,
-                TEMA_REALI_PESSOAS: clientesSebrae['CLIENTES'][i].TEMA_REALI_PESSOAS,
-                TEMA_REALI_PROCESSOS: clientesSebrae['CLIENTES'][i].TEMA_REALI_PROCESSOS
-              };
-            } else {
-              clientesPorSetor[j].TEMA_REALI_EMPREENDEDORISMO += clientesSebrae['CLIENTES'][i].TEMA_REALI_EMPREENDEDORISMO;
-              clientesPorSetor[j].TEMA_REALI_FINANCAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_FINANCAS;
-              clientesPorSetor[j].TEMA_REALI_INOVACAO += clientesSebrae['CLIENTES'][i].TEMA_REALI_INOVACAO;
-              clientesPorSetor[j].TEMA_REALI_LEIS_E_NORMAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_LEIS_E_NORMAS;
-              clientesPorSetor[j].TEMA_REALI_MERCADO += clientesSebrae['CLIENTES'][i].TEMA_REALI_MERCADO;
-              clientesPorSetor[j].TEMA_REALI_ORGANIZACAO += clientesSebrae['CLIENTES'][i].TEMA_REALI_ORGANIZACAO;
-              clientesPorSetor[j].TEMA_REALI_PESSOAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_PESSOAS;
-              clientesPorSetor[j].TEMA_REALI_PROCESSOS += clientesSebrae['CLIENTES'][i].TEMA_REALI_PROCESSOS;
-            }
-            break;
-
-          }
-          
-          
-        }try {
-          if (clientesPorSetor[j].TEMA_REALI_EMPREENDEDORISMO >= 10) {
-            console.log(clientesPorSetor[j])
-            }
-          
-        } catch (error) {
-          
-        }
-        
-
-      }
-      
-      
-    }
-   
-
-    )
   }
+
+  filtrarPorRealizacoes(setorArr: any) {
+    let clientesPorSetor: any = {
+       N_CLIENTES: 0,
+       TEMA_REALI_EMPREENDEDORISMO : 0, 
+       TEMA_REALI_FINANCAS : 0 ,
+       TEMA_REALI_INOVACAO : 0, 
+       TEMA_REALI_LEIS_E_NORMAS : 0,
+       TEMA_REALI_MERCADO : 0 ,
+       TEMA_REALI_ORGANIZACAO : 0,
+       TEMA_REALI_PESSOAS : 0 ,
+       TEMA_REALI_PROCESSOS : 0
+    };
+
+    let pip = pointIp;
+    let setor = 0
+      this.markerService.makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false).subscribe(clientesSebrae => {
+
+        for (var i = 0; i < clientesSebrae['CLIENTES'].length; i++) {
+          const lon = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[0];
+          const lat = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[1]
+
+            if(pip(setorArr[0], [lon, lat]) != 1){
+              
+              clientesPorSetor.N_CLIENTES++
+              clientesPorSetor.TEMA_REALI_EMPREENDEDORISMO += clientesSebrae['CLIENTES'][i].TEMA_REALI_EMPREENDEDORISMO;
+              clientesPorSetor.TEMA_REALI_FINANCAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_FINANCAS;
+              clientesPorSetor.TEMA_REALI_INOVACAO += clientesSebrae['CLIENTES'][i].TEMA_REALI_INOVACAO;
+              clientesPorSetor.TEMA_REALI_LEIS_E_NORMAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_LEIS_E_NORMAS;
+              clientesPorSetor.TEMA_REALI_MERCADO += clientesSebrae['CLIENTES'][i].TEMA_REALI_MERCADO;
+              clientesPorSetor.TEMA_REALI_ORGANIZACAO += clientesSebrae['CLIENTES'][i].TEMA_REALI_ORGANIZACAO;
+              clientesPorSetor.TEMA_REALI_PESSOAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_PESSOAS;
+              clientesPorSetor.TEMA_REALI_PROCESSOS += clientesSebrae['CLIENTES'][i].TEMA_REALI_PROCESSOS;        
+
+            }
+    
+    
+        }
+      })
+
+    return [clientesPorSetor]
+   
+   }
+
+   obterSetoresFilRealiz(numero?) {
+
+    let ArrayCoord: any = []
+    const dadosFiltrados = this.dados.filter(setor => setor.properties.realizacoes[this.valorfiltro] <= this.maxValue  && this.minValue <= setor.properties.realizacoes[this.valorfiltro] );
+    console.log(this.dados[0].properties.realizacoes.TEMA_REALI_ORGANIZACAO)
+    
+    setoresGroup.clearLayers();
+    this.map.removeControl(legendControl);
+    for (var i = 0; i < dadosFiltrados.length; i++) {
+      const setorLayer = L.geoJSON(dadosFiltrados[i], {
+        style: (feature) => ({
+          fillColor: getColor(dadosFiltrados[i].properties.renda),
+          fillOpacity: 0.5,
+          stroke: true,
+          weight: 1,
+          color: 'white'
+        }),
+        onEachFeature: (feature, layer) => {
+
+          let qtdClientes = 0;
+          let qtdRealiEmpreendedorismo = 0;
+          layer.bindPopup(`Nome: ${feature.properties.name}<br>Renda Media: ${feature.properties.renda}<br>Numero de Clientes: ${qtdClientes}<br>Numero de Clientes: ${qtdRealiEmpreendedorismo}`);
+          layer.on({
+            click: async (e) => {
+
+              ArrayCoord = [];
+              feature.geometry['coordinates'][0].forEach((coord) => {
+                ArrayCoord.push([coord[0], coord[1]]);
+              });
+
+              const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.obterClientesPorSetor(ArrayCoord);
+
+              layer.setPopupContent(`Nome: ${feature.properties.name}
+              <br>Renda media: ${feature.properties.renda}
+              <br>Numero de Clientes: ${qtdClientes}
+              <br>Realizacoes Empreendedorismo: ${qtdRealiEmpreendedorismo}
+              <br>Realizacoes Financas: ${qtdRealiFinancas}
+              <br>Realizacoes Inovacao: ${qtdRealiInovacao}
+              <br>Realizacoes Leis e Normas: ${qtdRealiLeiseNormas}
+              <br>Realizacoes Mercado: ${qtdRealiMercado}
+              <br>Realizacoes Pessoas: ${qtdRealiPessoas}
+              <br>Realizacoes Processos: ${qtdRealiProcessos}
+              <br>Total de Realizacoes: ${qtdRealiEmpreendedorismo + qtdRealiFinancas + qtdRealiInovacao + qtdRealiLeiseNormas + qtdRealiMercado + qtdRealiPessoas + qtdRealiProcessos}
+            
+              `);
+            },
+            mouseover: (e) => (this.highlightFeature(e)),
+            mouseout: (e) => (this.resetFeature(e))
+          });
+        }
+      });
+      setorLayer.addTo(setoresGroup);
+    }
+  }
+
+
   // renderiza os setores apartir do filtro
   obterSetoresFiltrados(rendaMinima) {
 
@@ -712,7 +756,7 @@ export class MapComponent implements AfterViewInit {
         break;
     }
     this.obterCliente();
-    this.filtrarPorRealizacoes()
+
   }
 }
 

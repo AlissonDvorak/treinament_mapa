@@ -12,6 +12,7 @@ import { DialogComponent } from './dialog/dialog.component';
 import { MatDialogModule } from '@angular/material/dialog';
 import { LoadingComponent } from './loading/loading.component';
 import { NgxSliderModule } from '@angular-slider/ngx-slider';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 
 
@@ -28,7 +29,9 @@ import { NgxSliderModule } from '@angular-slider/ngx-slider';
     BrowserModule,
     HttpClientModule,
     MatDialogModule,
-    NgxSliderModule
+    NgxSliderModule,
+    FormsModule,
+    ReactiveFormsModule
 
   ],
   providers: [

@@ -12,24 +12,27 @@
   <div class="map-container">
     <div class="map-frame">
       <app-loading *ngIf="isLoading"></app-loading>
-
+      
 
       <div class="box">
-        <select>
-          <option value="0">Filtros</option>
-          <option value="1">Numero de Clientes</option>
-          <option value="2">Empreendedorismo</option>
-          <option value="3">Financas</option>
-          <option value="4">Inovacao</option>
-          <option value="5">Leis e Normas</option>
-          <option value="6">Mercado</option>
-          <option value="7">Pessoas</option>
-          <option value="8">Processos</option>
+        <select [(ngModel)] = "valorfiltro">
+          <option value="">Filtros</option>
+          <option value="N_CLIENTES">Numero de Clientes</option>
+          <option value="TEMA_REALI_EMPREENDEDORISMO">Empreendedorismo</option>
+          <option value="TEMA_REALI_FINANCAS">Financas</option>
+          <option value="TEMA_REALI_INOVACAO">Inovacao</option>
+          <option value="TEMA_REALI_LEIS_E_NORMAS">Leis e Normas</option>
+          <option value="TEMA_REALI_MERCADO">Mercado</option>
+          <option value="TEMA_REALI_PESSOAS">Pessoas</option>
+          <option value="TEMA_REALI_PROCESSOS">Processos</option>
           
         </select>
         <ngx-slider [(value)]="minValue" [(highValue)]="maxValue" [options]="options" class="slider"></ngx-slider>
+        <button class="btn-filtro" (click)="obterSetoresFilRealiz()">FILTRAR</button>
       </div>
-
+      <div><button class="btn-recarregar" (click)="recarregarMapa();">RECARREGAR<br> INFORMACOES</button>
+      </div>
+       
       <div class="box-renda">
         <span>Filtro de Renda</span>
         
