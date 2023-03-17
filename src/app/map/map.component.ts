@@ -11,6 +11,8 @@ import 'leaflet-dialog';
 import { DialogComponent } from '../dialog/dialog.component';
 import 'leaflet-range';
 import { Options } from '@angular-slider/ngx-slider';
+import * as turf from '@turf/turf';
+import { ConstantPool } from '@angular/compiler';
 
 
 // variaveis iniciais
@@ -24,6 +26,7 @@ const _this = this
 var minimo = Infinity
 var maximo = - Infinity
 let legendControl;
+
 
 
 
@@ -73,7 +76,6 @@ export class MapComponent implements AfterViewInit {
     }
   };
 
-
   isLoading = true;
   private map: L.Map = {} as L.Map;
   private setoresIbge;
@@ -90,6 +92,7 @@ export class MapComponent implements AfterViewInit {
   dados: any;
   grupoUnidades: any
 
+
   // obter cordenadas da tela
   private getMapBounds() {
     var bounds = this.map.getBounds();
@@ -98,17 +101,14 @@ export class MapComponent implements AfterViewInit {
   }
 
 
-
   private initMap(): void {
 
     // inicializar mapa leaftlet
     this.map = L.map('map', {
-
       zoomControl: false,
       zoomAnimation: true,
       center: [-9.66625, -35.7351],
       zoom: 15.5,
-
     });
 
     this.basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -284,9 +284,7 @@ export class MapComponent implements AfterViewInit {
   resumoClientes(type) {
     var rendaMedia: any = [],
       sum = 0;
-
     let nClientes = this.clientesSebrae['CLIENTES'].length
-
     for (var i = 0; i < nClientes; i++) {
       let m = this.clientesSebrae['CLIENTES'][i]['RENDA_NOMINAL_MEDIA'];
       rendaMedia.push(m)
@@ -294,13 +292,10 @@ export class MapComponent implements AfterViewInit {
     for (var i = 0; i < nClientes; i++) {
       sum += rendaMedia[i];
     }
-
     let media = sum / nClientes
     const rendaMediaFormatada = media.toFixed(2);
     this.dialogText(nClientes, rendaMediaFormatada, type)
-
   }
-
 
 
   // Cria os marcadores da unidades Sebrae
@@ -312,13 +307,10 @@ export class MapComponent implements AfterViewInit {
       iconAnchor: [22, 94],
       shadowAnchor: [4, 62],
       popupAnchor: [-3, -76],
-
     });
     this.markerService.makeUnidadesMarkers().subscribe(UnidadeSebrae => {
       let e: any = []
-
       for (let geoloc in UnidadeSebrae) {
-
         let lon = UnidadeSebrae[geoloc].LOCATION.coordinates[0];
         let lat = UnidadeSebrae[geoloc].LOCATION.coordinates[1];
         let marker = L.marker([lat, lon], { icon: sebraeIcon });
@@ -339,7 +331,6 @@ export class MapComponent implements AfterViewInit {
     this.makeUnidades()
     this.obterSetores()
     this.checkBounds()
-
   }
 
   // Renderiza os todos os setores que estao na tela
@@ -348,6 +339,15 @@ export class MapComponent implements AfterViewInit {
     minimo = Infinity
     maximo = -Infinity
     let ArrayCoord: any = []
+
+    const slider = document.getElementById("renda-slider") as HTMLInputElement;
+    const output = document.getElementById("slider-value");
+    output!.innerHTML = slider.value;
+    slider.addEventListener("input", () => {
+      const rendaMinima = parseInt(slider.value);
+      this.obterSetoresFiltrados(rendaMinima);
+      output!.innerHTML = slider.value;
+    });
 
     this.shapeService.getStateShapes(`{"bottomLeft":{"lat":${sw ? sw.lat : this.southWest.lat}, "lng":${sw ? sw.lng : this.southWest.lng}},
     "topRight":{"lat":${ne ? ne.lat : this.northEast.lat},"lng":${ne ? ne.lng : this.northEast.lng}}}`)
@@ -358,19 +358,20 @@ export class MapComponent implements AfterViewInit {
 
         const dados = setoresIbge['SETORES'].map((setor) => {
           cont++;
-          const densidade = setor['V009'];
-          if (densidade < minimo) {
-            minimo = densidade;
+          const renda = setor['V009'];
+          if (renda < minimo) {
+            minimo = renda;
           }
-          if (densidade > maximo) {
-            maximo = densidade;
+          if (renda > maximo) {
+            maximo = renda;
           }
+
           return {
             type: "Feature",
             id: cont,
             properties: {
               name: setor['Nome_do_bairro'],
-              densidade: setor['V009']
+              renda: setor['V009'],
             },
             geometry: {
               type: "Polygon",
@@ -378,11 +379,12 @@ export class MapComponent implements AfterViewInit {
             }
           };
         });
+
         setoresGroup.clearLayers();
         for (var i = 0; i < dados.length; i++) {
           const setorLayer = L.geoJSON(dados[i], {
             style: (feature) => ({
-              fillColor: getColor(dados[i].properties.densidade),
+              fillColor: getColor(dados[i].properties.renda),
               fillOpacity: 0.5,
               stroke: true,
               weight: 1,
@@ -392,7 +394,7 @@ export class MapComponent implements AfterViewInit {
 
               let qtdClientes = 0;
               let qtdRealiEmpreendedorismo = 0;
-              layer.bindPopup(`Nome: ${feature.properties.name}<br>Densidade: ${feature.properties.densidade}<br>Numero de Clientes: ${qtdClientes}<br>Numero de Clientes: ${qtdRealiEmpreendedorismo}`);
+              layer.bindPopup(`Nome: ${feature.properties.name}<br>Renda Media: ${feature.properties.renda}<br>Numero de Clientes: ${qtdClientes}<br>Numero de Clientes: ${qtdRealiEmpreendedorismo}`);
               layer.on({
                 click: async (e) => {
 
@@ -404,7 +406,7 @@ export class MapComponent implements AfterViewInit {
                   const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.obterClientesPorSetor(ArrayCoord);
 
                   layer.setPopupContent(`Nome: ${feature.properties.name}
-                  <br>Densidade: ${feature.properties.densidade}
+                  <br>Renda media: ${feature.properties.renda}
                   <br>Numero de Clientes: ${qtdClientes}
                   <br>Realizacoes Empreendedorismo: ${qtdRealiEmpreendedorismo}
                   <br>Realizacoes Financas: ${qtdRealiFinancas}
@@ -414,6 +416,7 @@ export class MapComponent implements AfterViewInit {
                   <br>Realizacoes Pessoas: ${qtdRealiPessoas}
                   <br>Realizacoes Processos: ${qtdRealiProcessos}
                   <br>Total de Realizacoes: ${qtdRealiEmpreendedorismo + qtdRealiFinancas + qtdRealiInovacao + qtdRealiLeiseNormas + qtdRealiMercado + qtdRealiPessoas + qtdRealiProcessos}
+                
                   `);
                 },
                 mouseover: (e) => (this.highlightFeature(e)),
@@ -430,7 +433,125 @@ export class MapComponent implements AfterViewInit {
       })
   };
 
-// obtem os Clientes do setor clicado
+  filtrarPorRealizacoes() {
+
+
+    this.markerService.makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false).subscribe(clientesSebrae => {
+
+      this.markersClusters.clearLayers();
+      let clientesPorSetor = {};
+      
+    
+
+      for (var i = 0; i < clientesSebrae['CLIENTES'].length; i++) {
+        const lon = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[0];
+        const lat = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[1];
+
+        for (var j = 0; j < this.dados.length; j++) {
+          const setor = this.dados[j];
+
+
+          if (turf.booleanPointInPolygon(turf.point([lon, lat]), setor.geometry)) {
+            if (!clientesPorSetor[j]) {
+              clientesPorSetor[j] = {
+                TEMA_REALI_EMPREENDEDORISMO: clientesSebrae['CLIENTES'][i].TEMA_REALI_EMPREENDEDORISMO,
+                TEMA_REALI_FINANCAS: clientesSebrae['CLIENTES'][i].TEMA_REALI_FINANCAS,
+                TEMA_REALI_INOVACAO: clientesSebrae['CLIENTES'][i].TEMA_REALI_INOVACAO,
+                TEMA_REALI_LEIS_E_NORMAS: clientesSebrae['CLIENTES'][i].TEMA_REALI_LEIS_E_NORMAS,
+                TEMA_REALI_MERCADO: clientesSebrae['CLIENTES'][i].TEMA_REALI_MERCADO,
+                TEMA_REALI_ORGANIZACAO: clientesSebrae['CLIENTES'][i].TEMA_REALI_ORGANIZACAO,
+                TEMA_REALI_PESSOAS: clientesSebrae['CLIENTES'][i].TEMA_REALI_PESSOAS,
+                TEMA_REALI_PROCESSOS: clientesSebrae['CLIENTES'][i].TEMA_REALI_PROCESSOS
+              };
+            } else {
+              clientesPorSetor[j].TEMA_REALI_EMPREENDEDORISMO += clientesSebrae['CLIENTES'][i].TEMA_REALI_EMPREENDEDORISMO;
+              clientesPorSetor[j].TEMA_REALI_FINANCAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_FINANCAS;
+              clientesPorSetor[j].TEMA_REALI_INOVACAO += clientesSebrae['CLIENTES'][i].TEMA_REALI_INOVACAO;
+              clientesPorSetor[j].TEMA_REALI_LEIS_E_NORMAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_LEIS_E_NORMAS;
+              clientesPorSetor[j].TEMA_REALI_MERCADO += clientesSebrae['CLIENTES'][i].TEMA_REALI_MERCADO;
+              clientesPorSetor[j].TEMA_REALI_ORGANIZACAO += clientesSebrae['CLIENTES'][i].TEMA_REALI_ORGANIZACAO;
+              clientesPorSetor[j].TEMA_REALI_PESSOAS += clientesSebrae['CLIENTES'][i].TEMA_REALI_PESSOAS;
+              clientesPorSetor[j].TEMA_REALI_PROCESSOS += clientesSebrae['CLIENTES'][i].TEMA_REALI_PROCESSOS;
+            }
+            break;
+
+          }
+          
+          
+        }try {
+          if (clientesPorSetor[j].TEMA_REALI_EMPREENDEDORISMO >= 10) {
+            console.log(clientesPorSetor[j])
+            }
+          
+        } catch (error) {
+          
+        }
+        
+
+      }
+      
+      
+    }
+   
+
+    )
+  }
+  // renderiza os setores apartir do filtro
+  obterSetoresFiltrados(rendaMinima) {
+
+    let ArrayCoord: any = []
+    const dadosFiltrados = this.dados.filter(setor => setor.properties.renda >= rendaMinima);
+    setoresGroup.clearLayers();
+    this.map.removeControl(legendControl);
+    for (var i = 0; i < dadosFiltrados.length; i++) {
+      const setorLayer = L.geoJSON(dadosFiltrados[i], {
+        style: (feature) => ({
+          fillColor: getColor(dadosFiltrados[i].properties.renda),
+          fillOpacity: 0.5,
+          stroke: true,
+          weight: 1,
+          color: 'white'
+        }),
+        onEachFeature: (feature, layer) => {
+
+          let qtdClientes = 0;
+          let qtdRealiEmpreendedorismo = 0;
+          layer.bindPopup(`Nome: ${feature.properties.name}<br>Renda Media: ${feature.properties.renda}<br>Numero de Clientes: ${qtdClientes}<br>Numero de Clientes: ${qtdRealiEmpreendedorismo}`);
+          layer.on({
+            click: async (e) => {
+
+              ArrayCoord = [];
+              feature.geometry['coordinates'][0].forEach((coord) => {
+                ArrayCoord.push([coord[0], coord[1]]);
+              });
+
+              const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.obterClientesPorSetor(ArrayCoord);
+
+              layer.setPopupContent(`Nome: ${feature.properties.name}
+              <br>Renda media: ${feature.properties.renda}
+              <br>Numero de Clientes: ${qtdClientes}
+              <br>Realizacoes Empreendedorismo: ${qtdRealiEmpreendedorismo}
+              <br>Realizacoes Financas: ${qtdRealiFinancas}
+              <br>Realizacoes Inovacao: ${qtdRealiInovacao}
+              <br>Realizacoes Leis e Normas: ${qtdRealiLeiseNormas}
+              <br>Realizacoes Mercado: ${qtdRealiMercado}
+              <br>Realizacoes Pessoas: ${qtdRealiPessoas}
+              <br>Realizacoes Processos: ${qtdRealiProcessos}
+              <br>Total de Realizacoes: ${qtdRealiEmpreendedorismo + qtdRealiFinancas + qtdRealiInovacao + qtdRealiLeiseNormas + qtdRealiMercado + qtdRealiPessoas + qtdRealiProcessos}
+            
+              `);
+            },
+            mouseover: (e) => (this.highlightFeature(e)),
+            mouseout: (e) => (this.resetFeature(e))
+          });
+        }
+      });
+      setorLayer.addTo(setoresGroup);
+    }
+  }
+
+
+  // obtem os Clientes do setor clicado
   async obterClientesPorSetor(coordenadas) {
 
     interface MyResponse {
@@ -470,7 +591,7 @@ export class MapComponent implements AfterViewInit {
             const marker = L.marker([lat, lon]).bindPopup(
               `Código: <b>${clientes['CLIENTES'][i]["CODPARCEIRO"]}</b>
                <br>Renda Media: <b>${clientes['CLIENTES'][i]["RENDA_NOMINAL_MEDIA"]}</b>
-               <br>Renda Media: <b>${clientes['CLIENTES'][i]["RENDA_NOMINAL_MEDIA"]}</b>
+               
               `
             );
             this.markersClusters.addLayer(marker)
@@ -513,79 +634,85 @@ export class MapComponent implements AfterViewInit {
     return clientesSebrae;
   }
 
-// Renderiza os todos os clientes que estao na tela
-  obterCliente() {
-    this.isLoading = true
 
-    this.markerService.makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false).subscribe(clientesSebrae => {
-      this.markersClusters.clearLayers();
+  // Renderiza os todos os clientes que estao na tela
+  obterCliente(): void {
+    this.isLoading = true;
+    this.markerService
+      .makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false)
+      .subscribe((clientesSebrae) => {
+        this.updateMarkers(clientesSebrae['CLIENTES']);
+        this.clientesSebrae = clientesSebrae;
+        this.isLoading = false;
+      });
+  }
 
-      for (var i = 0; i < clientesSebrae['CLIENTES'].length; i++) {
-        const lon = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[0];
-        const lat = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[1];
+  private updateMarkers(clientes: any[]): void {
+    this.markersClusters.clearLayers();
 
-        const marker = L.marker([lat, lon]).bindPopup(
-          `Código: <b>${clientesSebrae['CLIENTES'][i]["CODPARCEIRO"]}</b>
-           <br>Renda Media: <b>${clientesSebrae['CLIENTES'][i]["RENDA_NOMINAL_MEDIA"]}</b>
-          `
-        );
+    for (const cliente of clientes) {
+      const lon = cliente.LOCATION.coordinates[0];
+      const lat = cliente.LOCATION.coordinates[1];
 
-        this.markersClusters.addLayer(marker)
+      const marker = L.marker([lat, lon]).bindPopup(
+        `Código: <b>${cliente.CODPARCEIRO}</b>
+         <br>Renda Media: <b>${cliente.RENDA_NOMINAL_MEDIA}</b>`
+      );
 
-      }
-      this.markersClusters.addTo(clienteGroup);
+      this.markersClusters.addLayer(marker);
+    }
 
-      clienteGroup.addTo(this.map)
-      this.clientesSebrae = clientesSebrae;
-      this.isLoading = false;
-    })
+    this.markersClusters.addTo(clienteGroup);
+    clienteGroup.addTo(this.map);
   }
 
 
   // faz a verificacao  do tipo geometrico que foi desenhado e manda o geoApiQuery
-  checkBounds(type?, layer?) {
+  checkBounds(type?: string, layer?: any): void {
     let ArrayCoord: any = []
     this.centroBounds = this.map.getCenter();
     clienteGroup.clearLayers();
-    if (type == 'polygon') {
-      layer.editing.latlngs[0][0].forEach((coord) => {
-        ArrayCoord.push([coord.lng, coord.lat]);
-      });
-      ArrayCoord.push(ArrayCoord[0]);
-      this.geoApiQuery = {
-        map_bounds_poligono: {
-          polygon: ArrayCoord
+
+    switch (type) {
+      case 'polygon':
+        layer.editing.latlngs[0][0].forEach((coord: any) => {
+          ArrayCoord.push([coord.lng, coord.lat]);
+        });
+        ArrayCoord.push(ArrayCoord[0]);
+        this.geoApiQuery = {
+          map_bounds_poligono: {
+            polygon: ArrayCoord
+          }
         }
-      }
+        break;
+      case 'circle':
+        this.geoApiQuery = {
+          map_center_circulo: {
+            center: {
+              lat: layer.getLatLng().lat,
+              lng: layer.getLatLng().lng
+            },
+            radius: layer.getRadius()
+          }
+        }
+        break;
+      default:
+        this.geoApiQuery = {
+          map_bounds_retangulo: {
+            bottomLeft: {
+              lat: this.southWest.lat,
+              lng: this.southWest.lng
+            },
+            topRight: {
+              lat: this.northEast.lat,
+              lng: this.northEast.lng
+            },
+          },
+        }
+        break;
     }
-    else if (type == 'circle') {
-
-      this.geoApiQuery = {
-        map_center_circulo: {
-          center: {
-            lat: layer.getLatLng().lat,
-            lng: layer.getLatLng().lng
-          },
-          radius: layer.getRadius()
-        }
-      }
-
-    } else {
-      this.geoApiQuery = {
-        map_bounds_retangulo: {
-          bottomLeft: {
-            lat: this.southWest.lat,
-            lng: this.southWest.lng
-          },
-          topRight: {
-            lat: this.northEast.lat,
-            lng: this.northEast.lng
-          },
-        },
-      }
-    };
-    this.obterCliente()
-
+    this.obterCliente();
+    this.filtrarPorRealizacoes()
   }
 }
 
