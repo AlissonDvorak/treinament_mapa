@@ -25,13 +25,28 @@
           <option value="6">Mercado</option>
           <option value="7">Pessoas</option>
           <option value="8">Processos</option>
+          
         </select>
         <ngx-slider [(value)]="minValue" [(highValue)]="maxValue" [options]="options" class="slider"></ngx-slider>
       </div>
 
-    
+      <div class="box-renda">
+        <span>Filtro de Renda</span>
+        
+        <div class="slider-container">
+          <div class="slider-content">
+            <span id="slider-value-min">0</span>
+            <input type="range" min="0" max="5400" value="0" class="slider" id="renda-slider" data-min="0" data-max="5400">
+            <span id="slider-value-max">5400+</span>
+            Valor atual: <span id="slider-value"></span>
+          </div>
+        </div>
+      </div>
+
+
+
       <div id="map"></div>
-      
+
     </div>
   </div>
   <script>
