@@ -28,9 +28,21 @@
           
         </select>
         <ngx-slider [(value)]="minValue" [(highValue)]="maxValue" [options]="options" class="slider"></ngx-slider>
-        <button class="btn-filtro" (click)="obterSetoresFilRealiz()">FILTRAR</button>
+        <button class="btn-filtro" (click)="getSectorsFilRealiz">FILTRAR</button>
       </div>
-      <div><button class="btn-recarregar" (click)="recarregarMapa();">RECARREGAR<br> INFORMACOES</button>
+      
+
+      <div class="box-PJPF">
+        <span >⠀⠀Tipo Cliente<br></span>
+        <select [(ngModel)] = "pessoaFiltro">
+          <option value="PJ">PJ</option>
+          <option value="PF">PF</option>
+        </select>
+        <span>⠀</span>
+        <button class="btn-pjpf" (click)="this.checkBounds()">FILTRAR</button>
+      </div>
+
+      <div><button class="btn-recarregar" (click)="refreshMap();">RECARREGAR<br> INFORMACOES</button>
       </div>
        
       <div class="box-renda">

@@ -1,18 +1,17 @@
-import { Component, AfterViewInit, ComponentFactoryResolver } from '@angular/core';
 import * as L from 'leaflet';
+import * as pointIp from 'robust-point-in-polygon';
+import { Component, AfterViewInit,} from '@angular/core';
 import { MarkerService, } from '../marker.service';
 import { ShapeService } from '../shape.service';
 import { MiniMap } from "leaflet-control-mini-map";
-import "leaflet-draw";
+import { DialogComponent } from '../dialog/dialog.component';
+import { Options } from '@angular-slider/ngx-slider';
 import { SearchControl, EsriProvider } from "leaflet-geosearch";
 import { MatDialog } from '@angular/material/dialog';
 import 'leaflet.control.opacity';
 import 'leaflet-dialog';
-import { DialogComponent } from '../dialog/dialog.component';
+import "leaflet-draw";
 import 'leaflet-range';
-import { Options } from '@angular-slider/ngx-slider';
-import * as turf from '@turf/turf';
-import * as pointIp from 'robust-point-in-polygon';
 
 
 // variaveis iniciais
@@ -20,14 +19,12 @@ const provider = new EsriProvider();
 const iconRetinaUrl = 'assets/marker-icon-2x.png';
 const iconUrl = 'assets/marker-icon.png';
 let openStreet = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-const setoresGroup = L.layerGroup();
+const sectorsGroup = L.layerGroup();
 const clienteGroup = L.layerGroup();
 const _this = this
 var minimo = Infinity
 var maximo = - Infinity
 let legendControl;
-
-
 
 
 // define palheta de cores
@@ -38,7 +35,6 @@ function getColor(d) {
         d > 1000 ? '#fd8d3c' :
           d > 500 ? '#f03b20' :
             '	#bd0026';
-
 }
 
 
@@ -52,8 +48,8 @@ const iconDefault = L.icon({
   tooltipAnchor: [16, -28],
 });
 
-L.Marker.prototype.options.icon = iconDefault;
 
+L.Marker.prototype.options.icon = iconDefault;
 @Component({
   selector: 'app-map',
   templateUrl: './map.component.html',
@@ -62,8 +58,8 @@ L.Marker.prototype.options.icon = iconDefault;
 })
 
 
-
 export class MapComponent implements AfterViewInit {
+  pessoaFiltro = "PJ"
   valorfiltro = 0
   minValue: number = 0;
   maxValue: number = 100;
@@ -129,7 +125,7 @@ export class MapComponent implements AfterViewInit {
         var center = this.map.getCenter();
         console.log("excedeu o tamanho");
       }
-      this.obterSetores(this.northEast, this.southWest);
+      this.getSectors(this.northEast, this.southWest);
       // this.checkBounds();
     });
 
@@ -180,11 +176,8 @@ export class MapComponent implements AfterViewInit {
       if (type === 'circle') {
         this.checkBounds(type, layer);
         this.resumoClientes('circulo')
-
       } else if (type === 'polygon') {
         this.checkBounds(type, layer);
-        // console.log(layer)
-
         this.resumoClientes('poligono')
       }
     });
@@ -192,7 +185,7 @@ export class MapComponent implements AfterViewInit {
 
 
   // legenda de renda
-  legenda() {
+  legendClients() {
     if (legendControl) {
       this.map.removeControl(legendControl);
     }
@@ -217,21 +210,16 @@ export class MapComponent implements AfterViewInit {
   }
 
 
-  // controle de camadas
-  camadas() {
+  // controle de layers
+  layers() {
     var baseMaps = {
       "OpenStreetMap": this.basemap,
     };
     var overlayMaps = {
       "Unidades Sebrae": this.grupoUnidades,
       "Clientes": this.markersClusters,
-      "setores": setoresGroup
+      "setores": sectorsGroup
     };
-    var Map_AddLayer = {
-      "setores": setoresGroup
-    }
-    var opacityControl = L.control.opacity(Map_AddLayer, { position: 'topright' });
-    opacityControl.addTo(this.map);
     L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(this.map);
   }
   constructor(private dialog: MatDialog, private markerService: MarkerService, private shapeService: ShapeService) { }
@@ -320,21 +308,23 @@ export class MapComponent implements AfterViewInit {
       }
       this.grupoUnidades = L.layerGroup(e)
       this.grupoUnidades.addTo(this.map)
-      this.camadas()
+      this.layers()
     })
   }
+
 
   // inicia os componentes
   ngAfterViewInit(): void {
 
     this.initMap();
     this.makeUnidades()
-    this.obterSetores()
+    this.getSectors()
     this.checkBounds()
   }
 
+  
   // Renderiza os todos os setores que estao na tela
-  obterSetores(sw?, ne?) {
+  getSectors(sw?, ne?) {
     let cont = 0;
     minimo = Infinity
     maximo = -Infinity
@@ -345,7 +335,7 @@ export class MapComponent implements AfterViewInit {
     output!.innerHTML = slider.value;
     slider.addEventListener("input", () => {
       const rendaMinima = parseInt(slider.value);
-      this.obterSetoresFiltrados(rendaMinima);
+      this.getSectorsFiltered(rendaMinima);
       output!.innerHTML = slider.value;
     });
 
@@ -366,14 +356,13 @@ export class MapComponent implements AfterViewInit {
             maximo = renda;
           }
           
-
           return {
             type: "Feature",
             id: cont,
             properties: {
               name: setor['Nome_do_bairro'],
               renda: setor['V009'],
-              realizacoes: this.filtrarPorRealizacoes(setor['geometry']['coordinates'])[0]
+              realizacoes: this.filterByAchievements(setor['geometry']['coordinates'])[0]
             },
             geometry: {
               type: "Polygon",
@@ -382,7 +371,7 @@ export class MapComponent implements AfterViewInit {
           };
         });
         
-        setoresGroup.clearLayers();
+        sectorsGroup.clearLayers();
         for (var i = 0; i < dados.length; i++) {
           const setorLayer = L.geoJSON(dados[i], {
             style: (feature) => ({
@@ -405,7 +394,7 @@ export class MapComponent implements AfterViewInit {
                     ArrayCoord.push([coord[0], coord[1]]);
                   });
 
-                  const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.obterClientesPorSetor(ArrayCoord);
+                  const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.getClientsForSector(ArrayCoord);
 
                   layer.setPopupContent(`Nome: ${feature.properties.name}
                   <br>Renda media: ${feature.properties.renda}
@@ -426,22 +415,24 @@ export class MapComponent implements AfterViewInit {
               });
             }
           });
-          setorLayer.addTo(setoresGroup);
+          setorLayer.addTo(sectorsGroup);
           clienteGroup.clearLayers();
-          setoresGroup.addTo(this.map);
+          sectorsGroup.addTo(this.map);
         }
         this.dados = dados
-        console.log(dados)
-        this.legenda()
+        this.legendClients()
       })
   };
-  recarregarMapa(){
-    this.obterSetores(this.northEast, this.southWest);
-    this.checkBounds();
 
+  // atualiza as informacoes do mapa
+  refreshMap(){
+    this.getSectors(this.northEast, this.southWest);
+    this.checkBounds();
   }
 
-  filtrarPorRealizacoes(setorArr: any) {
+
+  // renderiza os setores apartir do filtro de realizacoes 
+  filterByAchievements(setorArr: any) {
     let clientesPorSetor: any = {
        N_CLIENTES: 0,
        TEMA_REALI_EMPREENDEDORISMO : 0, 
@@ -456,7 +447,7 @@ export class MapComponent implements AfterViewInit {
 
     let pip = pointIp;
     let setor = 0
-      this.markerService.makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false).subscribe(clientesSebrae => {
+      this.markerService.makeclientsMarkers(this.geoApiQuery, this.pessoaFiltro, true, false, false).subscribe(clientesSebrae => {
 
         for (var i = 0; i < clientesSebrae['CLIENTES'].length; i++) {
           const lon = clientesSebrae['CLIENTES'][i].LOCATION.coordinates[0];
@@ -476,21 +467,19 @@ export class MapComponent implements AfterViewInit {
 
             }
     
-    
         }
       })
 
     return [clientesPorSetor]
-   
    }
 
-   obterSetoresFilRealiz(numero?) {
+
+  //  obtem o numero de realizacoes por setor 
+   getSectorsFilRealiz(numero?) {
 
     let ArrayCoord: any = []
-    const dadosFiltrados = this.dados.filter(setor => setor.properties.realizacoes[this.valorfiltro] <= this.maxValue  && this.minValue <= setor.properties.realizacoes[this.valorfiltro] );
-    console.log(this.dados[0].properties.realizacoes.TEMA_REALI_ORGANIZACAO)
-    
-    setoresGroup.clearLayers();
+    const dadosFiltrados = this.dados.filter(setor => setor.properties.realizacoes[this.valorfiltro] <= this.maxValue  && this.minValue <= setor.properties.realizacoes[this.valorfiltro] ); 
+    sectorsGroup.clearLayers();
     this.map.removeControl(legendControl);
     for (var i = 0; i < dadosFiltrados.length; i++) {
       const setorLayer = L.geoJSON(dadosFiltrados[i], {
@@ -513,9 +502,7 @@ export class MapComponent implements AfterViewInit {
               feature.geometry['coordinates'][0].forEach((coord) => {
                 ArrayCoord.push([coord[0], coord[1]]);
               });
-
-              const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.obterClientesPorSetor(ArrayCoord);
-
+              const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.getClientsForSector(ArrayCoord);
               layer.setPopupContent(`Nome: ${feature.properties.name}
               <br>Renda media: ${feature.properties.renda}
               <br>Numero de Clientes: ${qtdClientes}
@@ -527,7 +514,6 @@ export class MapComponent implements AfterViewInit {
               <br>Realizacoes Pessoas: ${qtdRealiPessoas}
               <br>Realizacoes Processos: ${qtdRealiProcessos}
               <br>Total de Realizacoes: ${qtdRealiEmpreendedorismo + qtdRealiFinancas + qtdRealiInovacao + qtdRealiLeiseNormas + qtdRealiMercado + qtdRealiPessoas + qtdRealiProcessos}
-            
               `);
             },
             mouseover: (e) => (this.highlightFeature(e)),
@@ -535,17 +521,17 @@ export class MapComponent implements AfterViewInit {
           });
         }
       });
-      setorLayer.addTo(setoresGroup);
+      setorLayer.addTo(sectorsGroup);
     }
   }
 
 
-  // renderiza os setores apartir do filtro
-  obterSetoresFiltrados(rendaMinima) {
+  // renderiza os setores apartir do filtro de renda
+  getSectorsFiltered(rendaMinima) {
 
     let ArrayCoord: any = []
     const dadosFiltrados = this.dados.filter(setor => setor.properties.renda >= rendaMinima);
-    setoresGroup.clearLayers();
+    sectorsGroup.clearLayers();
     this.map.removeControl(legendControl);
     for (var i = 0; i < dadosFiltrados.length; i++) {
       const setorLayer = L.geoJSON(dadosFiltrados[i], {
@@ -569,7 +555,7 @@ export class MapComponent implements AfterViewInit {
                 ArrayCoord.push([coord[0], coord[1]]);
               });
 
-              const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.obterClientesPorSetor(ArrayCoord);
+              const { qtdClientes, qtdRealiEmpreendedorismo, qtdRealiFinancas, qtdRealiInovacao, qtdRealiLeiseNormas, qtdRealiMercado, qtdRealiPessoas, qtdRealiProcessos, } = await this.getClientsForSector(ArrayCoord);
 
               layer.setPopupContent(`Nome: ${feature.properties.name}
               <br>Renda media: ${feature.properties.renda}
@@ -590,13 +576,13 @@ export class MapComponent implements AfterViewInit {
           });
         }
       });
-      setorLayer.addTo(setoresGroup);
+      setorLayer.addTo(sectorsGroup);
     }
   }
 
 
   // obtem os Clientes do setor clicado
-  async obterClientesPorSetor(coordenadas) {
+  async getClientsForSector(coordenadas) {
 
     interface MyResponse {
       qtdClientes,
@@ -625,7 +611,7 @@ export class MapComponent implements AfterViewInit {
       let qtdRealiPessoas = 0
       let qtdRealiProcessos = 0
 
-      this.markerService.makeclientsMarkers(geoApiQuery, 'PJ', true, false, false).subscribe({
+      this.markerService.makeclientsMarkers(geoApiQuery, this.pessoaFiltro, true, false, false).subscribe({
         next: clientes => {
           this.markersClusters.clearLayers();
           for (var i = 0; i < clientes['CLIENTES'].length; i++) {
@@ -680,10 +666,10 @@ export class MapComponent implements AfterViewInit {
 
 
   // Renderiza os todos os clientes que estao na tela
-  obterCliente(): void {
+  getClient(): void {
     this.isLoading = true;
     this.markerService
-      .makeclientsMarkers(this.geoApiQuery, 'PJ', true, false, false)
+      .makeclientsMarkers(this.geoApiQuery, this.pessoaFiltro, true, false, false)
       .subscribe((clientesSebrae) => {
         this.updateMarkers(clientesSebrae['CLIENTES']);
         this.clientesSebrae = clientesSebrae;
@@ -709,7 +695,7 @@ export class MapComponent implements AfterViewInit {
     this.markersClusters.addTo(clienteGroup);
     clienteGroup.addTo(this.map);
   }
-
+  
 
   // faz a verificacao  do tipo geometrico que foi desenhado e manda o geoApiQuery
   checkBounds(type?: string, layer?: any): void {
@@ -755,8 +741,7 @@ export class MapComponent implements AfterViewInit {
         }
         break;
     }
-    this.obterCliente();
-
+    this.getClient();
   }
 }
 
